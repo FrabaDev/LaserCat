@@ -1,218 +1,72 @@
-#include <MyWiFi.hh>
-#include <Decode.hh>
-#include <MyLaser.hh>
-#include <MyServo.hh>
-#include <MyProgramController.hh>
+#include <Arduino.h>
+#include <LittleFS.h>
+#include <ElegantOTA.h>
+#include "MyWiFi.hh"
+#include "MyLaser.hh"
+#include "MyServo.hh"
+#include "MyProgramController.hh"
+#include "WebInterface.hh"
 
-
+// GPIO pins (NodeMCU ESP8266)
+static const int servoPinA = 14;  // D5
+static const int servoPinB = 12;  // D6
+static const int laserPin  = 15;  // D8 — vía transistor NPN
 
 MyServo servoA;
 MyServo servoB;
-static const int servoPinA = 12;
-static const int servoPinB = 14;
+Laser   laser;
+MyWiFi  mywifi;
 
-
-static const int laserPin = 32;
-Laser laser;
-
-MyWiFi mywifi;
-
-
-
-
-
-static const bool SERIAL_PRINTLN = false;
+int  programNumber      = 0;
+bool loopActive         = false;
 bool firstClientConnected = false;
 
-
-
-// Client variables 
-char linebuf[80];
-int charcount=0;
-
-
-void setupServos(){
-  servoA.setup(
-        servoPinA, 
-        0.0,
-        "Servo A",
-        0,
-        90,
-        544, //853,
-        1550 //1859
-    );
-
-  servoB.setup(
-        servoPinB,
-        0.0,
-        "Servo B",
-        -85,
-        85
-    );
-    
+void setupServos() {
+    servoA.setup(servoPinA, 0.0, "Servo A", 0,   90,  544, 1550);
+    servoB.setup(servoPinB, 0.0, "Servo B", -85, 85);
 }
 
-void setupLaser(){
-  laser.setup(laserPin);
-  laser.onWithDelay();
-  laser.offWithDelay();
+void setupLaser() {
+    laser.setup(laserPin);
+    laser.onWithDelay();
+    laser.offWithDelay();
 }
 
-//this might be necessary if the client looses connection to the server 
-//and the esp does not recognize this.
-//In this case, the esp would stick with the already dead client.
-void checkForNewerClient(){
-  WiFiClient tempClient;
-  if (tempClient=mywifi.server.available()){
-    mywifi.client.stop();
-    mywifi.client=tempClient;
-  }
-}
+void setup() {
+    Serial.begin(115200);
+    delay(100);
 
-void randomWait(){
-  Serial.println("begin randomWait");
-  long waitTimeInSeconds = random(30,150);
-  for (long i=0; i < (waitTimeInSeconds*10); i++){
-    if(mywifi.client){
-      if (mywifi.client.connected()){
-        //Serial.println("randomWait: client is connnected");
-        if (mywifi.client.available()){
-          //Serial.println("randomWait: client is available");
-          break;
-        }
-        checkForNewerClient();
-      }
-    }else{
-      //Serial.println("check for client available");
-      mywifi.client = mywifi.server.available();
+    if (!LittleFS.begin()) {
+        Serial.println("LittleFS mount failed!");
+    } else {
+        Serial.println("LittleFS mounted");
     }
-    delay(100); // 0.1 seconds
-  }
-  Serial.println("randomWait: end");
+
+    mywifi.begin();
+    WebInterface::begin(servoA, servoB, laser,
+                        programNumber, loopActive, firstClientConnected);
+
+    setupServos();
+    setupLaser();
+
+    delay(1000);
+    servoA.initMove();
+    servoB.initMove();
 }
 
+void loop() {
+    static MyProgramController progCont(servoA, servoB, laser);
 
+    ElegantOTA.loop();
+    ws.cleanupClients();
 
-
-
-void setup() 
-{
-  Serial.begin(115200);
-  while(!Serial) {
-  }
-  //initial Serial Lines get dropped
-  Serial.println("");
-  Serial.println("");
-  
-  mywifi.setup();
-  setupServos();
-  setupLaser();
-
-  
-  delay(5000);
-  servoA.initMove();
-  servoB.initMove();
-  //program(255);
-  
-  
-
-  
-}
- 
-void loop() 
-{
-  static floatResult orderForServoA,orderForServoB;
-  static intResult orderForProgram;
-  static boolResult orderForLaser, orderForLoop;
-  static int programNumber = 0;
-  static bool loopActive = false;
-  static MyProgramController progCont(servoA, servoB, laser);
-  // int64_t now = esp_timer_get_time();
-  
-  // listen for incoming clients
-
-  
-  if (mywifi.client) 
-  {
-    firstClientConnected = true;
-    Serial.println("New client");
-    memset(linebuf,0,sizeof(linebuf));
-    charcount=0;
- 
-    while (mywifi.client.connected()) 
-    {
-      //Serial.write("connected loop");
-      
-      if (mywifi.client.available()) 
-      {
-        //Serial.write("available loop");
-        
-        char c = mywifi.client.read();
-        
-        if (charcount<sizeof(linebuf)-1){
-          linebuf[charcount]=c;
-          charcount++;
-        } 
-        
-        if (c == '\n' && charcount > 5) 
-        {
-          if (SERIAL_PRINTLN) {
-            Serial.write(linebuf,charcount);
-          }
-
-          
-          if (orderForLoop.evaluate(linebuf, "loop="))
-          {
-            loopActive = orderForLoop.value;            
-          }
-                    
-          if (orderForProgram.evaluate(linebuf, "prog="))
-          {
-            programNumber = orderForProgram.value;
-            progCont.program(programNumber);
-            if (programNumber == MyProgramController::RANDOM_PROG_NUMBER){
-              randomWait();
-            }
-          }else{
-            if (orderForServoA.evaluate(linebuf, "posA=")){
-              servoA.moveAbs(orderForServoA.value);
-            } 
-            if (orderForServoB.evaluate(linebuf, "posB=")){
-              servoB.moveAbs(orderForServoB.value);
-            }
-            if (orderForLaser.evaluate(linebuf, "Laser=")){
-              laser.setState(orderForLaser.value);
-            }
-          }
-          
-          // you're starting a new line
-          memset(linebuf,0,sizeof(linebuf));
-          charcount=0;
-        }
-      }
-      else{
-        if (loopActive){
-          progCont.program(programNumber);
-          if (programNumber == MyProgramController::RANDOM_PROG_NUMBER){
-            randomWait();
-          }
-        }
-      }
-      checkForNewerClient();
-      delay(1);
+    if (!firstClientConnected && millis() > 120000UL) {
+        progCont.randProgram();
     }
- 
-    // close the connection:
-    mywifi.client.stop();
-    Serial.println("client disconnected");
-  }else{
-    mywifi.keepAlive();
-    mywifi.client = mywifi.server.available();
-    if (!mywifi.client && !firstClientConnected && (esp_timer_get_time() > 120000000LL)){
-      progCont.randProgram();
-      randomWait();
-    }
-    delay(1);
-  }
-}
 
+    if (loopActive) {
+        progCont.program(programNumber);
+    }
+
+    yield();
+}

@@ -109,35 +109,33 @@ void MyProgramController::program(const int programnumber){
   
   switch (programnumber)
   {
-  case 1:    
+  case 1:
     home();
+    laser.on();
     delay(timeBetweenPositions);
     servoA.moveAbs(45.0);
-    servoB.moveAbs(-90.0);
-    laser.off();
+    servoB.moveAbs(-85.0);
     delay(timeBetweenPositions);
     servoA.moveAbs(90.0);
     servoB.moveAbs(0.0);
-    laser.off();
     delay(timeBetweenPositions);
     servoA.moveAbs(45.0);
-    servoB.moveAbs(90.0);
-    laser.off();
+    servoB.moveAbs(85.0);
     delay(timeBetweenPositions);
     servoA.moveAbs(0.0);
     servoB.moveAbs(0.0);
-    laser.off();
     home();
     break;
 
   case 2:
     home();
+    laser.on();
     G0(90.0,0.0);
     G0(0.0,0.0);
     delay(2000);
-    G0(0.0,90.0);
-    G0(0.0,-90.0);
-    G0(0.0, 0.0);    
+    G0(0.0,85.0);
+    G0(0.0,-85.0);
+    G0(0.0, 0.0);
     home();
     break;
 
@@ -273,7 +271,7 @@ void MyProgramController::program(const int programnumber){
 
 
   case RANDOM_PROG_NUMBER: //250
-    randomSeed(esp_timer_get_time());
+    randomSeed(micros());
     program(random(3,7));
     break;
 

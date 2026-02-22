@@ -4,7 +4,7 @@
 
 
     void MyServo::setup(int pin, float home, String name, int minAngle , int maxAngle , int minPulseWidth , int maxPulseWidth ){
-        servo.attach(pin, Servo::CHANNEL_NOT_ATTACHED, minAngle*10, maxAngle*10, minPulseWidth, maxPulseWidth);
+        servo.attach(pin, minPulseWidth, maxPulseWidth);
         angle=NAN;
         this->minAngle=minAngle;
         this->maxAngle=maxAngle;
@@ -15,10 +15,10 @@
     }
     void MyServo::moveAbs(float position){
         float angleWithinLimits = constrain(position, minAngle, maxAngle);
-        servo.write((int)(angleWithinLimits*10));
+        servo.write((int)angleWithinLimits);
         angle=angleWithinLimits;
         if (SERIAL_PRINTLN) Serial.println(name + " moves to " + String(angle));
-        
+
     }
 
     void MyServo::moveRel(float increment){
@@ -46,7 +46,7 @@
             moveRelWithDelay(1);
         }
         moveAbsWithDelay(home);
-        
+
     }
 
     float MyServo::getAngle() const {

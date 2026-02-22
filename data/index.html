@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Cat Laser</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 16px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  h1 { text-align:center; font-size:1.4rem; margin-bottom:12px; color:#ff4444; letter-spacing:1px; }
+  .card { background:#1a1a1a; border-radius:12px; padding:16px; margin-bottom:14px; border:1px solid #2a2a2a; }
+  .card h2 { font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:#666; margin-bottom:14px; }
+  .status-bar { text-align:center; font-size:0.75rem; color:#666; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:#444; flex-shrink:0; }
+  .status-dot.connected { background:#44cc44; }
+
+  /* ── Cruceta ── */
+  .pad-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .pad-angles { font-size:0.85rem; font-variant-numeric:tabular-nums; }
+  .pad-angles span { color:#ff4444; font-weight:700; }
+  .btn-flip { padding:5px 10px; background:#222; border:1px solid #444; border-radius:6px; color:#aaa; font-size:0.75rem; cursor:pointer; }
+  .btn-flip.active { border-color:#ff4444; color:#ff4444; }
+
+  #pad {
+    position:relative; width:100%; max-width:320px; aspect-ratio:1;
+    background:#111; border:2px solid #2a2a2a; border-radius:12px;
+    touch-action:none; cursor:crosshair; overflow:hidden; margin:0 auto;
+  }
+  #pad::before {
+    content:''; position:absolute; inset:0;
+    background: linear-gradient(#1c1c1c 1px, transparent 1px),
+                linear-gradient(90deg, #1c1c1c 1px, transparent 1px);
+    background-size:25% 25%;
+  }
+  .pad-hline,.pad-vline { position:absolute; background:#242424; pointer-events:none; }
+  .pad-hline { top:50%; left:0; right:0; height:1px; transform:translateY(-50%); }
+  .pad-vline { left:50%; top:0; bottom:0; width:1px; transform:translateX(-50%); }
+  #ch-h,#ch-v { position:absolute; background:rgba(255,68,68,0.3); pointer-events:none; }
+  #ch-h { height:1px; top:0; left:0; right:0; }
+  #ch-v { width:1px;  top:0; bottom:0; left:0; }
+  #dot {
+    position:absolute; width:22px; height:22px; border-radius:50%;
+    background:#ff4444; box-shadow:0 0 10px rgba(255,68,68,0.8);
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  .pad-label { position:absolute; font-size:0.6rem; color:#383838; pointer-events:none; }
+  .pad-label.top    { top:4px;    left:50%; transform:translateX(-50%); }
+  .pad-label.bottom { bottom:4px; left:50%; transform:translateX(-50%); }
+  .pad-label.left   { left:4px;   top:50%;  transform:translateY(-50%); }
+  .pad-label.right  { right:4px;  top:50%;  transform:translateY(-50%); }
+
+  /* ── Laser ── */
+  .btn-laser {
+    width:100%; padding:14px; font-size:1rem; font-weight:700;
+    background:#222; border:2px solid #333; border-radius:10px;
+    color:#aaa; cursor:pointer; transition:background .2s, border-color .2s, color .2s;
+  }
+  .btn-laser.on { background:#2a0000; border-color:#ff4444; color:#ff4444; }
+
+  /* ── Temporizador ── */
+  .timer-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .timer-presets { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .btn-preset { padding:7px 12px; background:#222; border:1px solid #333; border-radius:6px; color:#aaa; font-size:0.8rem; cursor:pointer; }
+  .btn-preset:hover { border-color:#ff4444; color:#ff4444; }
+  .timer-input { flex:1; min-width:60px; padding:8px; background:#111; border:1px solid #333; border-radius:8px; color:#e0e0e0; font-size:1rem; text-align:center; }
+  .timer-input:focus { outline:none; border-color:#ff4444; }
+  .timer-unit { color:#666; font-size:0.8rem; }
+  .btn-timer { padding:9px 16px; background:#333; border:none; border-radius:8px; color:#fff; font-size:0.9rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .btn-timer.running { background:#7a2a00; color:#ffaa44; }
+  .timer-display { text-align:center; font-size:1.8rem; font-variant-numeric:tabular-nums; font-weight:700; color:#ff4444; letter-spacing:2px; min-height:2.2rem; }
+  .timer-display.idle { color:#333; }
+
+  /* ── Programas ── */
+  .prog-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px; }
+  .btn-prog { padding:12px 4px; text-align:center; border-radius:8px; background:#222; border:2px solid transparent; cursor:pointer; font-size:0.9rem; color:#e0e0e0; transition:background .15s,border-color .15s; }
+  .btn-prog.active { border-color:#ff4444; background:#2a0a0a; color:#ff4444; }
+  .btn-loop { width:100%; padding:10px; background:#222; border:2px solid #333; border-radius:8px; color:#888; font-size:0.9rem; cursor:pointer; transition:all .2s; }
+  .btn-loop.on { background:#0a1f0a; border-color:#44cc44; color:#44cc44; }
+
+  /* ── WiFi ── */
+  label { display:block; font-size:0.8rem; color:#666; margin-bottom:4px; }
+  input[type="text"],input[type="password"] { width:100%; padding:10px 12px; background:#111; border:1px solid #333; border-radius:8px; color:#e0e0e0; font-size:0.9rem; margin-bottom:10px; }
+  input[type="text"]:focus,input[type="password"]:focus { outline:none; border-color:#ff4444; }
+  .btn-save { width:100%; padding:12px; background:#ff4444; border:none; border-radius:8px; color:#fff; font-size:0.95rem; font-weight:700; cursor:pointer; }
+  footer { text-align:center; margin-top:4px; font-size:0.8rem; color:#555; }
+  footer a { color:#ff4444; text-decoration:none; }
+</style>
+</head>
+<body>
+
+<h1>&#x1F431; Cat Laser</h1>
+
+<div class="status-bar">
+  <div class="status-dot" id="wsDot"></div>
+  <span id="wsStatus">Conectando...</span>
+</div>
+
+<!-- Cruceta 2D -->
+<div class="card">
+  <h2>Control</h2>
+  <div class="pad-header">
+    <div class="pad-angles">A: <span id="valA">0°</span> &nbsp; B: <span id="valB">0°</span></div>
+    <button class="btn-flip" id="btnFlip" onclick="toggleFlip()" title="Invertir eje izquierda/derecha">&#x21C4; Flip B</button>
+  </div>
+  <div id="pad">
+    <div class="pad-hline"></div>
+    <div class="pad-vline"></div>
+    <div id="ch-h"></div>
+    <div id="ch-v"></div>
+    <div id="dot"></div>
+    <div class="pad-label top">A 90°</div>
+    <div class="pad-label bottom">A 0°</div>
+    <div class="pad-label left" id="lblLeft">B -85°</div>
+    <div class="pad-label right" id="lblRight">B 85°</div>
+  </div>
+</div>
+
+<!-- Laser -->
+<div class="card">
+  <h2>Laser</h2>
+  <button class="btn-laser" id="btnLaser" onclick="toggleLaser()">APAGADO</button>
+</div>
+
+<!-- Temporizador -->
+<div class="card">
+  <h2>Temporizador</h2>
+  <div class="timer-presets">
+    <button class="btn-preset" onclick="setTimer(5)">5 min</button>
+    <button class="btn-preset" onclick="setTimer(10)">10 min</button>
+    <button class="btn-preset" onclick="setTimer(15)">15 min</button>
+    <button class="btn-preset" onclick="setTimer(30)">30 min</button>
+  </div>
+  <div class="timer-row">
+    <input class="timer-input" type="number" id="timerMin" min="1" max="120" value="10" placeholder="min">
+    <span class="timer-unit">min</span>
+    <button class="btn-timer" id="btnTimer" onclick="toggleTimer()">Iniciar</button>
+  </div>
+  <div class="timer-display idle" id="timerDisplay">--:--</div>
+</div>
+
+<!-- Programas -->
+<div class="card">
+  <h2>Programas</h2>
+  <div class="prog-grid">
+    <div class="btn-prog" id="prog1"   onclick="sendProgram(1)">1</div>
+    <div class="btn-prog" id="prog2"   onclick="sendProgram(2)">2</div>
+    <div class="btn-prog" id="prog3"   onclick="sendProgram(3)">3</div>
+    <div class="btn-prog" id="prog4"   onclick="sendProgram(4)">4</div>
+    <div class="btn-prog" id="prog5"   onclick="sendProgram(5)">5</div>
+    <div class="btn-prog" id="prog6"   onclick="sendProgram(6)">6</div>
+    <div class="btn-prog" id="prog250" onclick="sendProgram(250)" style="grid-column:span 2;">Aleatorio</div>
+  </div>
+  <button class="btn-loop" id="btnLoop" onclick="toggleLoop()">Loop: OFF</button>
+</div>
+
+<!-- WiFi -->
+<div class="card">
+  <h2>WiFi</h2>
+  <label>SSID</label>
+  <input type="text" id="wifiSsid" placeholder="Nombre de red">
+  <label>Contrasena</label>
+  <input type="password" id="wifiPass" placeholder="Contrasena">
+  <button class="btn-save" onclick="saveWifi()">Guardar y reiniciar</button>
+</div>
+
+<footer><a href="/update">Actualizar firmware (OTA)</a></footer>
+
+<script>
+// ── Estado ──
+var ws;
+var laserState = false, loopState = false;
+var curA = 0, curB = 0;
+var flipB = false;
+var sendTimer = null, pendingA = 0, pendingB = 0;
+
+// ── WebSocket ──
+function connect() {
+  var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws');
+  ws.onopen = function() {
+    document.getElementById('wsDot').className = 'status-dot connected';
+    document.getElementById('wsStatus').textContent = 'Conectado';
+  };
+  ws.onclose = function() {
+    document.getElementById('wsDot').className = 'status-dot';
+    document.getElementById('wsStatus').textContent = 'Reconectando...';
+    setTimeout(connect, 2000);
+  };
+  ws.onerror = function() { ws.close(); };
+  ws.onmessage = function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      if (d.servoA !== undefined) { curA = d.servoA; setDotFromAngles(d.servoA, curB); }
+      if (d.servoB !== undefined) { curB = d.servoB; setDotFromAngles(curA, d.servoB); }
+      if (d.laser   !== undefined) updateLaser(d.laser);
+      if (d.program !== undefined) updateProgram(d.program);
+      if (d.loop    !== undefined) updateLoop(d.loop);
+    } catch(err) {}
+  };
+}
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+// ── Cruceta ──
+var pad = document.getElementById('pad');
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function padXYtoAngles(px, py, w, h) {
+  var rawB = (px / w) * 170 - 85;
+  var B = clamp(flipB ? -rawB : rawB, -85, 85);
+  var A = clamp(90 - (py / h) * 90, 0, 90);
+  return { A: Math.round(A), B: Math.round(B) };
+}
+function anglesToPadXY(A, B, w, h) {
+  var rawB = flipB ? -B : B;
+  return { x: ((rawB + 85) / 170) * w, y: ((90 - A) / 90) * h };
+}
+function moveDot(px, py) {
+  var w = pad.offsetWidth, h = pad.offsetHeight;
+  px = clamp(px, 0, w); py = clamp(py, 0, h);
+  document.getElementById('dot').style.left  = px + 'px';
+  document.getElementById('dot').style.top   = py + 'px';
+  document.getElementById('ch-h').style.top  = py + 'px';
+  document.getElementById('ch-v').style.left = px + 'px';
+  var ang = padXYtoAngles(px, py, w, h);
+  curA = ang.A; curB = ang.B;
+  document.getElementById('valA').textContent = ang.A + '\u00b0';
+  document.getElementById('valB').textContent = ang.B + '\u00b0';
+  pendingA = ang.A; pendingB = ang.B;
+  clearTimeout(sendTimer);
+  sendTimer = setTimeout(function() {
+    send({ cmd:'servo', axis:'A', angle: pendingA });
+    send({ cmd:'servo', axis:'B', angle: pendingB });
+  }, 60);
+}
+function setDotFromAngles(A, B) {
+  var w = pad.offsetWidth, h = pad.offsetHeight;
+  var p = anglesToPadXY(A, B, w, h);
+  document.getElementById('dot').style.left  = p.x + 'px';
+  document.getElementById('dot').style.top   = p.y + 'px';
+  document.getElementById('ch-h').style.top  = p.y + 'px';
+  document.getElementById('ch-v').style.left = p.x + 'px';
+  document.getElementById('valA').textContent = Math.round(A) + '\u00b0';
+  document.getElementById('valB').textContent = Math.round(B) + '\u00b0';
+}
+function toggleFlip() {
+  flipB = !flipB;
+  document.getElementById('btnFlip').className = 'btn-flip' + (flipB ? ' active' : '');
+  document.getElementById('lblLeft').textContent  = flipB ? 'B 85°'  : 'B -85°';
+  document.getElementById('lblRight').textContent = flipB ? 'B -85°' : 'B 85°';
+  setDotFromAngles(curA, curB);
+}
+
+var active = false;
+pad.addEventListener('pointerdown', function(e) {
+  active = true;
+  pad.setPointerCapture(e.pointerId);
+  var r = pad.getBoundingClientRect();
+  moveDot(e.clientX - r.left, e.clientY - r.top);
+  e.preventDefault();
+});
+pad.addEventListener('pointermove', function(e) {
+  if (!active) return;
+  var r = pad.getBoundingClientRect();
+  moveDot(e.clientX - r.left, e.clientY - r.top);
+  e.preventDefault();
+});
+pad.addEventListener('pointerup',     function() { active = false; });
+pad.addEventListener('pointercancel', function() { active = false; });
+
+window.addEventListener('load', function() { setDotFromAngles(0, 0); });
+
+// ── Laser ──
+function toggleLaser() {
+  laserState = !laserState;
+  send({ cmd:'laser', state: laserState });
+  updateLaser(laserState);
+}
+function updateLaser(state) {
+  laserState = state;
+  var btn = document.getElementById('btnLaser');
+  btn.textContent = state ? 'ENCENDIDO' : 'APAGADO';
+  btn.className = 'btn-laser' + (state ? ' on' : '');
+}
+
+// ── Temporizador ──
+var timerInterval = null;
+var timerEndTime  = 0;
+
+function setTimer(min) {
+  document.getElementById('timerMin').value = min;
+}
+
+function toggleTimer() {
+  if (timerInterval) {
+    stopTimer();
+  } else {
+    var min = parseInt(document.getElementById('timerMin').value) || 10;
+    startTimer(min);
+  }
+}
+
+function startTimer(minutes) {
+  timerEndTime = Date.now() + minutes * 60000;
+  timerInterval = setInterval(tickTimer, 500);
+  document.getElementById('btnTimer').textContent = 'Detener';
+  document.getElementById('btnTimer').className = 'btn-timer running';
+  document.getElementById('timerDisplay').className = 'timer-display';
+  tickTimer();
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('btnTimer').textContent = 'Iniciar';
+  document.getElementById('btnTimer').className = 'btn-timer';
+  document.getElementById('timerDisplay').className = 'timer-display idle';
+  document.getElementById('timerDisplay').textContent = '--:--';
+}
+
+function tickTimer() {
+  var remaining = timerEndTime - Date.now();
+  if (remaining <= 0) {
+    document.getElementById('timerDisplay').textContent = '00:00';
+    stopTimer();
+    // Apagar laser y detener loop
+    send({ cmd:'laser', state: false });
+    send({ cmd:'loop',  active: false });
+    updateLaser(false);
+    updateLoop(false);
+    return;
+  }
+  var totalSec = Math.ceil(remaining / 1000);
+  var m = Math.floor(totalSec / 60);
+  var s = totalSec % 60;
+  document.getElementById('timerDisplay').textContent =
+    (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// ── Programas ──
+function sendProgram(num) {
+  send({ cmd:'program', number: num });
+  updateProgram(num);
+}
+function updateProgram(num) {
+  [1,2,3,4,5,6,250].forEach(function(id) {
+    var el = document.getElementById('prog' + id);
+    if (el) el.className = 'btn-prog' + (id === num ? ' active' : '');
+  });
+}
+
+// ── Loop ──
+function toggleLoop() {
+  loopState = !loopState;
+  send({ cmd:'loop', active: loopState });
+  updateLoop(loopState);
+}
+function updateLoop(state) {
+  loopState = state;
+  var btn = document.getElementById('btnLoop');
+  btn.textContent = 'Loop: ' + (state ? 'ON' : 'OFF');
+  btn.className = 'btn-loop' + (state ? ' on' : '');
+}
+
+// ── WiFi ──
+function saveWifi() {
+  var ssid = document.getElementById('wifiSsid').value.trim();
+  var pass = document.getElementById('wifiPass').value;
+  if (!ssid) { alert('Ingresa el SSID'); return; }
+  var form = new FormData();
+  form.append('ssid', ssid);
+  form.append('password', pass);
+  fetch('/wifi', { method:'POST', body: form })
+    .then(function(r) { return r.text(); })
+    .then(function(t) { alert(t); })
+    .catch(function(e) { alert('Error: ' + e); });
+}
+
+connect();
+</script>
+</body>
+</html>
