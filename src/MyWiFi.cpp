@@ -1,5 +1,6 @@
 #include "MyWiFi.hh"
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
@@ -36,6 +37,8 @@ void MyWiFi::begin() {
             _isSTA = true;
             Serial.print("WiFi: Connected, IP: ");
             Serial.println(WiFi.localIP());
+            MDNS.begin("lasercat");
+            Serial.println("mDNS: lasercat.local");
             return;
         }
         Serial.println("WiFi: Connection failed, starting AP");
@@ -46,6 +49,7 @@ void MyWiFi::begin() {
     WiFi.softAP("CatLaser-Setup");
     Serial.print("WiFi: AP started, IP: ");
     Serial.println(WiFi.softAPIP());
+    MDNS.begin("lasercat");
     _isSTA = false;
 }
 

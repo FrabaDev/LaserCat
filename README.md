@@ -37,21 +37,17 @@ Basado en el proyecto original [funny0facer/2AxisCatLaser](https://github.com/fu
 
 ## Diagrama de conexión
 
-```
-NodeMCU                Componentes
-─────────────────────────────────────────────
-D5 (GPIO14) ──────────► Servo A  (señal)
-D6 (GPIO12) ──────────► Servo B  (señal)
-D8 (GPIO15) ──[ 1kΩ ]──► Base transistor NPN
-                          Colector ──► Láser (+)
-                          Emisor   ──► GND
+![Diagrama de conexión](docs/diagram.svg)
 
-VIN ──────────────────► Servo A/B (VCC)
-                        Láser (+) vía transistor
-GND ──────────────────► Servo A/B (GND)
-                        Emisor transistor
-                        Láser (GND)
-```
+| NodeMCU | → | Componente |
+|---------|---|-----------|
+| D5 · GPIO14 | señal | Servo A |
+| D6 · GPIO12 | señal | Servo B |
+| D8 · GPIO15 | → 1kΩ → Base NPN | Transistor láser |
+| VIN (5V) | VCC | Servo A · Servo B · Láser (+) |
+| GND | GND | Servo A · Servo B · Emisor NPN |
+
+Circuito láser (low-side switch): `VIN → Láser(+) → Láser(−) → Colector NPN → Emisor → GND`
 
 > ⚠️ **No alimentes los servos desde el pin 3V3 del NodeMCU** — consumen demasiada corriente. Usa VIN (5 V) o una fuente externa.
 
@@ -132,6 +128,8 @@ pio device monitor -b 115200
 ```
 
 A partir de aquí ya no necesitas el cable USB.
+
+El dispositivo también responde en **`http://lasercat.local`** (mDNS) desde cualquier equipo en la misma red, sin necesitar la IP.
 
 ---
 

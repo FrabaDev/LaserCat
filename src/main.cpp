@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <ElegantOTA.h>
+#include <ESP8266mDNS.h>
 #include "MyWiFi.hh"
 #include "MyLaser.hh"
 #include "MyServo.hh"
@@ -59,6 +60,7 @@ void loop() {
 
     ElegantOTA.loop();
     ws.cleanupClients();
+    MDNS.update();
 
     if (!firstClientConnected && millis() > 120000UL) {
         progCont.randProgram();
